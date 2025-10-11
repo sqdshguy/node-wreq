@@ -210,9 +210,9 @@ Available browser profiles (78+ profiles):
 
 ## 📖 Documentation
 
-- **[Architecture Guide](docs/ARCHITECTURE.md)** - Technical details about TLS/HTTP2 fingerprinting, how browser impersonation works
-- **[Build Instructions](docs/BUILD.md)** - Developer guide for building from source
-- **[Publishing Guide](docs/PUBLISHING.md)** - How to publish the package
+- **[Architecture Guide](docs/ARCHITECTURE.md)** — Technical details about TLS/HTTP2 fingerprinting, how browser impersonation works
+- **[Build Instructions](docs/BUILD.md)** — Developer guide for building from source
+- **[Publishing Guide](docs/PUBLISHING.md)** — How to publish the package
 
 ## 🤝 Contributions are welcome!
 
