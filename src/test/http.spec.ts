@@ -24,7 +24,7 @@ describe('HTTP', () => {
 
   test('should make a simple GET request', async () => {
     const response = await request({
-      url: 'https://httpbin.org/get',
+      url: 'https://httpbingo.org/get',
       browser: 'chrome_131',
       timeout: 10000,
     });
@@ -42,7 +42,7 @@ describe('HTTP', () => {
   });
 
   test('should work with different browser profiles', async () => {
-    const testUrl = 'https://httpbin.org/user-agent';
+    const testUrl = 'https://httpbingo.org/user-agent';
     const browsers = ['chrome_137', 'firefox_139', 'safari_18'];
 
     for (const browser of browsers) {
@@ -66,7 +66,7 @@ describe('HTTP', () => {
     await assert.rejects(
       async () => {
         await request({
-          url: 'https://httpbin.org/delay/10',
+          url: 'https://httpbingo.org/delay/10',
           browser: 'chrome_137',
           timeout: 1000, // 1 second timeout for 10 second delay
         });
