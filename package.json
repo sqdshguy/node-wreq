@@ -33,15 +33,18 @@
     "browser-fingerprint-bypass"
   ],
   "author": "will-work-for-meal",
+  "contributors": [
+    "Oleksandr Herasymov"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/will-work-for-meal/node-wreq.git"
+    "url": "git+https://github.com/sqdshguy/node-wreq.git"
   },
   "bugs": {
-    "url": "https://github.com/will-work-for-meal/node-wreq/issues"
+    "url": "https://github.com/sqdshguy/node-wreq/issues"
   },
-  "homepage": "https://github.com/will-work-for-meal/node-wreq#readme",
+  "homepage": "https://github.com/sqdshguy/node-wreq#readme",
   "devDependencies": {
     "@napi-rs/cli": "^2.18.0",
     "@types/node": "^20.0.0",

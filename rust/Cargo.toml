@@ -3,6 +3,7 @@ name = "node-wreq"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+authors = ["will-work-for-meal", "Oleksandr Herasymov"]
 
 [lib]
 crate-type = ["cdylib"]
