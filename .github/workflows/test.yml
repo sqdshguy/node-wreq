@@ -15,35 +15,35 @@ jobs:
             node-version: 20
             arch: x64
           - os: ubuntu-latest
-            node-version: 21
+            node-version: 22
             arch: x64
           - os: ubuntu-latest
-            node-version: 22
+            node-version: 24
             arch: x64
           - os: macos-latest
             node-version: 20
             arch: x64
           - os: macos-latest
-            node-version: 21
+            node-version: 22
             arch: x64
           - os: macos-latest
-            node-version: 22
+            node-version: 24
             arch: x64
           - os: windows-latest
             node-version: 20
             arch: x64
           - os: windows-latest
-            node-version: 21
+            node-version: 22
             arch: x64
           - os: windows-latest
-            node-version: 22
+            node-version: 24
             arch: x64
           # ARM64 tests on supported platforms
           - os: macos-14
-            node-version: 22
+            node-version: 24
             arch: arm64
           - os: ubuntu-24.04-arm
-            node-version: 22
+            node-version: 24
             arch: arm64
 
     name: Test on Node ${{ matrix.node-version }} (${{ matrix.arch }}) - ${{ matrix.os }}
@@ -51,10 +51,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -100,12 +100,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
