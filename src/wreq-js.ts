@@ -38,6 +38,7 @@ function loadNativeBinding() {
     },
     linux: {
       x64: 'linux-x64-gnu',
+      arm64: 'linux-arm64-gnu',
     },
     win32: {
       x64: 'win32-x64-msvc',
@@ -49,7 +50,7 @@ function loadNativeBinding() {
   if (!platformArch) {
     throw new Error(
       `Unsupported platform: ${platform}-${arch}. ` +
-        `Supported platforms: darwin-x64, darwin-arm64, linux-x64, win32-x64`
+        `Supported platforms: darwin-x64, darwin-arm64, linux-x64, linux-arm64, win32-x64`
     );
   }
 
