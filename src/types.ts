@@ -1,11 +1,11 @@
 // Import and re-export the auto-generated BrowserProfile type
-import type { BrowserProfile } from './generated-types';
+import type { BrowserProfile } from "./generated-types";
 export type { BrowserProfile };
 
 /**
  * HTTP method types
  */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD';
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD";
 
 /**
  * Request options for making HTTP requests with browser impersonation
@@ -132,6 +132,6 @@ export interface NativeWebSocketConnection {
 export class RequestError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'RequestError';
+    this.name = "RequestError";
   }
 }

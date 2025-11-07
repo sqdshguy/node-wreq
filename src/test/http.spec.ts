@@ -1,54 +1,54 @@
-import { test, describe, before } from 'node:test';
-import assert from 'node:assert';
-import { request, getProfiles } from '../wreq-js';
+import { test, describe, before } from "node:test";
+import assert from "node:assert";
+import { request, getProfiles } from "../wreq-js";
 
-describe('HTTP', () => {
+describe("HTTP", () => {
   before(() => {
-    console.log('🔌 HTTP Test Suite\n');
+    console.log("🔌 HTTP Test Suite\n");
   });
 
-  test('should return available browser profiles', () => {
+  test("should return available browser profiles", () => {
     const profiles = getProfiles();
 
-    assert.ok(Array.isArray(profiles), 'Profiles should be an array');
-    assert.ok(profiles.length > 0, 'Should have at least one profile');
+    assert.ok(Array.isArray(profiles), "Profiles should be an array");
+    assert.ok(profiles.length > 0, "Should have at least one profile");
     assert.ok(
-      profiles.some((p) => p.includes('chrome')) ||
-        profiles.some((p) => p.includes('firefox')) ||
-        profiles.some((p) => p.includes('safari')),
-      'Should include standard browser profiles'
+      profiles.some((p) => p.includes("chrome")) ||
+        profiles.some((p) => p.includes("firefox")) ||
+        profiles.some((p) => p.includes("safari")),
+      "Should include standard browser profiles",
     );
 
-    console.log('Available profiles:', profiles.join(', '));
+    console.log("Available profiles:", profiles.join(", "));
   });
 
-  test('should make a simple GET request', async () => {
+  test("should make a simple GET request", async () => {
     const response = await request({
-      url: 'https://httpbingo.org/get',
-      browser: 'chrome_131',
+      url: "https://httpbingo.org/get",
+      browser: "chrome_131",
       timeout: 10000,
     });
 
-    assert.ok(response.status >= 200 && response.status < 300, 'Should return successful status');
-    assert.ok(Object.keys(response.headers).length > 0, 'Should have response headers');
-    assert.ok(response.body.length > 0, 'Should have response body');
+    assert.ok(response.status >= 200 && response.status < 300, "Should return successful status");
+    assert.ok(Object.keys(response.headers).length > 0, "Should have response headers");
+    assert.ok(response.body.length > 0, "Should have response body");
 
     const body = JSON.parse(response.body);
 
-    assert.ok(body.headers['User-Agent'], 'Should have User-Agent header');
+    assert.ok(body.headers["User-Agent"], "Should have User-Agent header");
 
-    console.log('Status:', response.status);
-    console.log('User-Agent:', body.headers['User-Agent']);
+    console.log("Status:", response.status);
+    console.log("User-Agent:", body.headers["User-Agent"]);
   });
 
-  test('should work with different browser profiles', async () => {
-    const testUrl = 'https://httpbingo.org/user-agent';
-    const browsers = ['chrome_137', 'firefox_139', 'safari_18'];
+  test("should work with different browser profiles", async () => {
+    const testUrl = "https://httpbingo.org/user-agent";
+    const browsers = ["chrome_137", "firefox_139", "safari_18"] as const;
 
     for (const browser of browsers) {
       const response = await request({
         url: testUrl,
-        browser: browser as any,
+        browser,
         timeout: 10000,
       });
 
@@ -56,25 +56,25 @@ describe('HTTP', () => {
 
       const data = JSON.parse(response.body);
 
-      assert.ok(data['user-agent'], `${browser} should have user-agent`);
+      assert.ok(data["user-agent"], `${browser} should have user-agent`);
 
-      console.log(`${browser}:`, data['user-agent'].substring(0, 70) + '...');
+      console.log(`${browser}:`, `${data["user-agent"].substring(0, 70)}...`);
     }
   });
 
-  test('should handle timeout errors', async () => {
+  test("should handle timeout errors", async () => {
     await assert.rejects(
       async () => {
         await request({
-          url: 'https://httpbingo.org/delay/10',
-          browser: 'chrome_137',
+          url: "https://httpbingo.org/delay/10",
+          browser: "chrome_137",
           timeout: 1000, // 1 second timeout for 10 second delay
         });
       },
       {
-        name: 'RequestError',
+        name: "RequestError",
       },
-      'Should throw an error on timeout'
+      "Should throw an error on timeout",
     );
   });
 });

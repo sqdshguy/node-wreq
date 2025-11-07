@@ -1,11 +1,5 @@
-import type {
-  RequestOptions,
-  Response,
-  BrowserProfile,
-  WebSocketOptions,
-  NativeWebSocketConnection,
-} from './types';
-import { RequestError } from './types';
+import type { RequestOptions, Response, BrowserProfile, WebSocketOptions, NativeWebSocketConnection } from "./types";
+import { RequestError } from "./types";
 
 interface NativeWebSocketOptions {
   url: string;
@@ -33,15 +27,15 @@ function loadNativeBinding() {
   // napi-rs creates files like: wreq-js.linux-x64-gnu.node
   const platformArchMap: Record<string, Record<string, string>> = {
     darwin: {
-      x64: 'darwin-x64',
-      arm64: 'darwin-arm64',
+      x64: "darwin-x64",
+      arm64: "darwin-arm64",
     },
     linux: {
-      x64: 'linux-x64-gnu',
-      arm64: 'linux-arm64-gnu',
+      x64: "linux-x64-gnu",
+      arm64: "linux-arm64-gnu",
     },
     win32: {
-      x64: 'win32-x64-msvc',
+      x64: "win32-x64-msvc",
     },
   };
 
@@ -50,7 +44,7 @@ function loadNativeBinding() {
   if (!platformArch) {
     throw new Error(
       `Unsupported platform: ${platform}-${arch}. ` +
-        `Supported platforms: darwin-x64, darwin-arm64, linux-x64, linux-arm64, win32-x64`
+        `Supported platforms: darwin-x64, darwin-arm64, linux-x64, linux-arm64, win32-x64`,
     );
   }
 
@@ -59,25 +53,21 @@ function loadNativeBinding() {
 
   try {
     return require(`../rust/${binaryName}`);
-  } catch (e1) {
+  } catch {
     // Fallback to wreq-js.node (for local development)
     try {
-      return require('../rust/wreq-js.node');
-    } catch (e2) {
+      return require("../rust/wreq-js.node");
+    } catch {
       throw new Error(
         `Failed to load native module for ${platform}-${arch}. ` +
           `Tried: ../rust/${binaryName} and ../rust/wreq-js.node. ` +
-          `Make sure the package is installed correctly and the native module is built for your platform.`
+          `Make sure the package is installed correctly and the native module is built for your platform.`,
       );
     }
   }
 }
 
-try {
-  nativeBinding = loadNativeBinding();
-} catch (error) {
-  throw error;
-}
+nativeBinding = loadNativeBinding();
 
 /**
  * Make an HTTP request with browser impersonation
@@ -103,16 +93,14 @@ try {
  */
 export async function request(options: RequestOptions): Promise<Response> {
   if (!options.url) {
-    throw new RequestError('URL is required');
+    throw new RequestError("URL is required");
   }
 
   if (options.browser) {
     const profiles = getProfiles();
 
     if (!profiles.includes(options.browser)) {
-      throw new RequestError(
-        `Invalid browser profile: ${options.browser}. Available profiles: ${profiles.join(', ')}`
-      );
+      throw new RequestError(`Invalid browser profile: ${options.browser}. Available profiles: ${profiles.join(", ")}`);
     }
   }
 
@@ -154,11 +142,8 @@ export function getProfiles(): BrowserProfile[] {
  * const response = await get('https://example.com/api');
  * ```
  */
-export async function get(
-  url: string,
-  options?: Omit<RequestOptions, 'url' | 'method'>
-): Promise<Response> {
-  return request({ ...options, url, method: 'GET' });
+export async function get(url: string, options?: Omit<RequestOptions, "url" | "method">): Promise<Response> {
+  return request({ ...options, url, method: "GET" });
 }
 
 /**
@@ -183,9 +168,9 @@ export async function get(
 export async function post(
   url: string,
   body?: string,
-  options?: Omit<RequestOptions, 'url' | 'method' | 'body'>
+  options?: Omit<RequestOptions, "url" | "method" | "body">,
 ): Promise<Response> {
-  return request({ ...options, url, method: 'POST', body });
+  return request({ ...options, url, method: "POST", body });
 }
 
 /**
@@ -257,27 +242,25 @@ export class WebSocket {
  */
 export async function websocket(options: WebSocketOptions): Promise<WebSocket> {
   if (!options.url) {
-    throw new RequestError('URL is required');
+    throw new RequestError("URL is required");
   }
 
   if (!options.onMessage) {
-    throw new RequestError('onMessage callback is required');
+    throw new RequestError("onMessage callback is required");
   }
 
   if (options.browser) {
     const profiles = getProfiles();
 
     if (!profiles.includes(options.browser)) {
-      throw new RequestError(
-        `Invalid browser profile: ${options.browser}. Available profiles: ${profiles.join(', ')}`
-      );
+      throw new RequestError(`Invalid browser profile: ${options.browser}. Available profiles: ${profiles.join(", ")}`);
     }
   }
 
   try {
     const connection = await nativeBinding.websocketConnect({
       url: options.url,
-      browser: options.browser || 'chrome_137',
+      browser: options.browser || "chrome_137",
       headers: options.headers || {},
       proxy: options.proxy,
       onMessage: options.onMessage,
@@ -297,7 +280,7 @@ export type {
   BrowserProfile,
   HttpMethod,
   WebSocketOptions,
-} from './types';
+} from "./types";
 
 export type { RequestError };
 
