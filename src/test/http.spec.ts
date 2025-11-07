@@ -1,6 +1,6 @@
-import { test, describe, before } from "node:test";
 import assert from "node:assert";
-import { request, getProfiles } from "../wreq-js";
+import { before, describe, test } from "node:test";
+import { getProfiles, request } from "../wreq-js";
 
 describe("HTTP", () => {
   before(() => {

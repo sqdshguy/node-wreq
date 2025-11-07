@@ -1,4 +1,4 @@
-import type { RequestOptions, Response, BrowserProfile, WebSocketOptions, NativeWebSocketConnection } from "./types";
+import type { BrowserProfile, NativeWebSocketConnection, RequestOptions, Response, WebSocketOptions } from "./types";
 import { RequestError } from "./types";
 
 interface NativeWebSocketOptions {
@@ -170,7 +170,7 @@ export async function post(
   body?: string,
   options?: Omit<RequestOptions, "url" | "method" | "body">,
 ): Promise<Response> {
-  return request({ ...options, url, method: "POST", body });
+  return request({ ...options, url, method: "POST", ...(body !== undefined && { body }) });
 }
 
 /**
@@ -262,10 +262,10 @@ export async function websocket(options: WebSocketOptions): Promise<WebSocket> {
       url: options.url,
       browser: options.browser || "chrome_137",
       headers: options.headers || {},
-      proxy: options.proxy,
+      ...(options.proxy !== undefined && { proxy: options.proxy }),
       onMessage: options.onMessage,
-      onClose: options.onClose,
-      onError: options.onError,
+      ...(options.onClose !== undefined && { onClose: options.onClose }),
+      ...(options.onError !== undefined && { onError: options.onError }),
     });
 
     return new WebSocket(connection);
@@ -275,10 +275,10 @@ export async function websocket(options: WebSocketOptions): Promise<WebSocket> {
 }
 
 export type {
-  RequestOptions,
-  Response,
   BrowserProfile,
   HttpMethod,
+  RequestOptions,
+  Response,
   WebSocketOptions,
 } from "./types";
 

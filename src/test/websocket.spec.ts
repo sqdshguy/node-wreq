@@ -1,5 +1,5 @@
-import { test, describe, before } from "node:test";
 import assert from "node:assert";
+import { before, describe, test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { websocket } from "../wreq-js";
 
