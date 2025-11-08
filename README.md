@@ -61,49 +61,50 @@ Note on GitHub installs: if a matching prebuilt binary is not available for the 
 ### Basic Request
 
 ```typescript
-import { request } from 'wreq-js';
+import { fetch } from 'wreq-js';
 
-const response = await request({
-  url: 'https://example.com/api',
-  browser: 'chrome_137',
+const response = await fetch('https://example.com/api', {
+  browser: 'chrome_142',
 });
 
-console.log(response.status);  // 200
-console.log(response.body);    // Response body
-console.log(response.headers); // Response headers
-console.log(response.cookies); // Cookies
+const data = await response.json();
+
+console.log(response.status);            // 200
+console.log(response.headers.get('date'));
+console.log(response.cookies);           // Parsed cookies
+console.log(response.body);              // Raw body string (wreq extension)
+console.log(data);                       // Parsed JSON body
 ```
 
 ### With Custom Headers
 
 ```typescript
-import { request } from 'wreq-js';
+import { fetch, Headers } from 'wreq-js';
 
-const response = await request({
-  url: 'https://api.example.com/data',
+const headers = new Headers({
+  Authorization: 'Bearer token123',
+  'Custom-Header': 'value',
+});
+
+const response = await fetch('https://api.example.com/data', {
   browser: 'firefox_139',
-  headers: {
-    'Authorization': 'Bearer token123',
-    'Custom-Header': 'value',
-  },
+  headers,
 });
 ```
 
 ### POST Request
 
 ```typescript
-import { post } from 'wreq-js';
+import { fetch } from 'wreq-js';
 
-const response = await post(
-  'https://api.example.com/submit',
-  JSON.stringify({ foo: 'bar' }),
-  {
-    browser: 'chrome_137',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  }
-);
+const response = await fetch('https://api.example.com/submit', {
+  method: 'POST',
+  browser: 'chrome_142',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ foo: 'bar' }),
+});
 ```
 
 ### Convenience Methods
@@ -114,21 +115,21 @@ import { get, post } from 'wreq-js';
 // GET request
 const data = await get('https://api.example.com/users');
 
-// POST request
+// POST request helper (wraps fetch internally)
 const result = await post(
   'https://api.example.com/users',
-  JSON.stringify({ name: 'John' })
+  JSON.stringify({ name: 'John' }),
+  { headers: { 'Content-Type': 'application/json' } },
 );
 ```
 
 ### With Proxy
 
 ```typescript
-import { request } from 'wreq-js';
+import { fetch } from 'wreq-js';
 
-const response = await request({
-  url: 'https://example.com',
-  browser: 'chrome_137',
+const response = await fetch('https://example.com', {
+  browser: 'chrome_142',
   // proxy: 'http://proxy.example.com:8080',
   // proxy: 'http://username:password@proxy.example.com:8080',
   // proxy: 'socks5://proxy.example.com:1080',
@@ -142,7 +143,7 @@ import { websocket } from 'wreq-js';
 
 const ws = await websocket({
   url: 'wss://echo.websocket.org',
-  browser: 'chrome_137',
+  browser: 'chrome_142',
   onMessage: (data) => {
     console.log('Received:', data);
   },
@@ -166,37 +167,51 @@ await ws.close();
 
 ## API Reference
 
-### `request(options:` [`RequestOptions`](#requestoptions)`): Promise<`[`Response`](#response)`>`
+### `fetch(input: string | URL, init?: RequestInit): Promise<Response>`
 
-Main function for making HTTP requests with browser impersonation.
+Fetch-compatible API that proxies requests through the Rust engine while preserving the familiar ergonomics of `fetch()`.
 
-**Options:**
-<a name="requestoptions"></a>
+**RequestInit (wreq extensions in bold):**
 
 ```typescript
-interface RequestOptions {
-  url: string;                    // Required: URL to request
-  browser?: BrowserProfile;       // Default: 'chrome_137'
-  method?: HttpMethod;            // Default: 'GET'
-  headers?: Record<string, string>;
-  body?: string;
-  proxy?: string;                 // HTTP/HTTPS/SOCKS5 proxy URL
-  timeout?: number;               // Default: 30000ms
+interface RequestInit {
+  method?: string;                // Defaults to 'GET'
+  headers?: HeadersInit;          // Headers | Record | Iterable<[string, string]>
+  body?: BodyInit | null;         // string / Buffer / (ArrayBuffer|View) / URLSearchParams
+  signal?: AbortSignal | null;    // Abort with DOMException('AbortError')
+  redirect?: 'follow';            // Only 'follow' is currently supported
+  /** Browser impersonation profile (e.g., 'chrome_142') */
+  browser?: BrowserProfile;
+  /** Optional proxy URL */
+  proxy?: string;
+  /** Request timeout in milliseconds (default 30000) */
+  timeout?: number;
 }
 ```
+
+`Headers`, `HeadersInit`, and `BodyInit` mirror the standard Fetch API, and the package exports a concrete `Headers` implementation for Node.js environments.
 
 **Response:**
-<a name="response"></a>
 
 ```typescript
-interface Response {
-  status: number;
-  headers: Record<string, string>;
-  body: string;
-  cookies: Record<string, string>;
-  url: string;  // Final URL after redirects
+class Response {
+  readonly status: number;
+  readonly statusText: string;
+  readonly ok: boolean;
+  readonly headers: Headers;
+  readonly url: string;
+  readonly redirected: boolean;
+  readonly type: 'basic';
+  readonly cookies: Record<string, string>; // wreq-specific extension
+  readonly body: string;                    // wreq-specific extension
+  bodyUsed: boolean;
+  json<T = unknown>(): Promise<T>;
+  text(): Promise<string>;
+  clone(): Response;
 }
 ```
+
+> `request()` is still exported for backwards compatibility, but it simply delegates to `fetch()` and is considered deprecated.
 
 ### `get(url: string, options?): Promise<`[`Response`](#response)`>`
 
@@ -211,7 +226,7 @@ interface Response {
 ```typescript
 interface WebSocketOptions {
   url: string;                                  // Required: WebSocket URL (ws:// or wss://)
-  browser?: BrowserProfile;                     // Default: 'chrome_137'
+  browser?: BrowserProfile;                     // Default: 'chrome_142'
   headers?: Record<string, string>;
   proxy?: string;                               // HTTP/HTTPS/SOCKS5 proxy URL
   onMessage: (data: string | Buffer) => void;   // Required: Message callback
@@ -239,7 +254,7 @@ import { getProfiles } from 'wreq-js';
 const profiles = getProfiles();
 
 console.log(profiles);
-// ['chrome_100', 'chrome_101', ..., 'chrome_137', 'edge_101', ..., 'safari_18', ...]
+// ['chrome_100', 'chrome_101', ..., 'chrome_142', 'edge_101', ..., 'safari_18', ...]
 ```
 
 ## Documentation
