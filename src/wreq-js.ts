@@ -1,4 +1,14 @@
-import type { BrowserProfile, NativeWebSocketConnection, RequestOptions, Response, WebSocketOptions } from "./types";
+import { STATUS_CODES } from "node:http";
+import type {
+  BodyInit,
+  BrowserProfile,
+  HeadersInit,
+  NativeResponse,
+  NativeWebSocketConnection,
+  RequestOptions,
+  WebSocketOptions,
+  RequestInit as WreqRequestInit,
+} from "./types";
 import { RequestError } from "./types";
 
 interface NativeWebSocketOptions {
@@ -12,7 +22,7 @@ interface NativeWebSocketOptions {
 }
 
 let nativeBinding: {
-  request: (options: RequestOptions) => Promise<Response>;
+  request: (options: RequestOptions) => Promise<NativeResponse>;
   getProfiles: () => string[];
   websocketConnect: (options: NativeWebSocketOptions) => Promise<NativeWebSocketConnection>;
   websocketSend: (ws: NativeWebSocketConnection, data: string | Buffer) => Promise<void>;
@@ -78,46 +88,485 @@ const websocketFinalizer =
       })
     : undefined;
 
+const DEFAULT_BROWSER: BrowserProfile = "chrome_142";
+
+type HeaderStoreEntry = {
+  name: string;
+  values: string[];
+};
+
+function isIterable<T>(value: unknown): value is Iterable<T> {
+  return Boolean(value) && typeof (value as Iterable<T>)[Symbol.iterator] === "function";
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function coerceHeaderValue(value: unknown): string {
+  return String(value);
+}
+
+export class Headers implements Iterable<[string, string]> {
+  private readonly store = new Map<string, HeaderStoreEntry>();
+
+  constructor(init?: HeadersInit) {
+    if (init) {
+      this.applyInit(init);
+    }
+  }
+
+  private applyInit(init: HeadersInit) {
+    if (init instanceof Headers) {
+      for (const [name, value] of init) {
+        this.append(name, value);
+      }
+      return;
+    }
+
+    if (Array.isArray(init) || isIterable<[string, string]>(init)) {
+      for (const tuple of init as Iterable<[string, string]>) {
+        if (!tuple) {
+          continue;
+        }
+        const [name, value] = tuple;
+        this.append(name, value);
+      }
+      return;
+    }
+
+    if (isPlainObject(init)) {
+      for (const [name, value] of Object.entries(init)) {
+        if (value === undefined || value === null) {
+          continue;
+        }
+        this.set(name, coerceHeaderValue(value));
+      }
+    }
+  }
+
+  private normalizeName(name: string): { key: string; display: string } {
+    if (typeof name !== "string") {
+      throw new TypeError("Header name must be a string");
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new TypeError("Header name must not be empty");
+    }
+    return { key: trimmed.toLowerCase(), display: trimmed };
+  }
+
+  private assertValue(value: unknown): string {
+    if (value === undefined || value === null) {
+      throw new TypeError("Header value must not be null or undefined");
+    }
+
+    return coerceHeaderValue(value);
+  }
+
+  append(name: string, value: unknown): void {
+    const normalized = this.normalizeName(name);
+    const existing = this.store.get(normalized.key);
+    const coercedValue = this.assertValue(value);
+
+    if (existing) {
+      existing.values.push(coercedValue);
+      return;
+    }
+
+    this.store.set(normalized.key, {
+      name: normalized.display,
+      values: [coercedValue],
+    });
+  }
+
+  set(name: string, value: unknown): void {
+    const normalized = this.normalizeName(name);
+    const coercedValue = this.assertValue(value);
+
+    this.store.set(normalized.key, {
+      name: normalized.display,
+      values: [coercedValue],
+    });
+  }
+
+  get(name: string): string | null {
+    const normalized = this.normalizeName(name);
+    const entry = this.store.get(normalized.key);
+    return entry ? entry.values.join(", ") : null;
+  }
+
+  has(name: string): boolean {
+    const normalized = this.normalizeName(name);
+    return this.store.has(normalized.key);
+  }
+
+  delete(name: string): void {
+    const normalized = this.normalizeName(name);
+    this.store.delete(normalized.key);
+  }
+
+  entries(): IterableIterator<[string, string]> {
+    return this[Symbol.iterator]();
+  }
+
+  *keys(): IterableIterator<string> {
+    for (const [name] of this) {
+      yield name;
+    }
+  }
+
+  *values(): IterableIterator<string> {
+    for (const [, value] of this) {
+      yield value;
+    }
+  }
+
+  forEach(callback: (value: string, name: string, parent: Headers) => void, thisArg?: unknown): void {
+    for (const [name, value] of this) {
+      callback.call(thisArg, value, name, this);
+    }
+  }
+
+  [Symbol.iterator](): IterableIterator<[string, string]> {
+    const generator = function* (store: Map<string, HeaderStoreEntry>) {
+      for (const entry of store.values()) {
+        yield [entry.name, entry.values.join(", ")] as [string, string];
+      }
+    };
+
+    return generator(this.store);
+  }
+
+  toObject(): Record<string, string> {
+    const result: Record<string, string> = {};
+
+    for (const [name, value] of this) {
+      result[name] = value;
+    }
+
+    return result;
+  }
+}
+
+type ResponseType = "basic" | "cors" | "error" | "opaque" | "opaqueredirect";
+
+function cloneNativeResponse(payload: NativeResponse): NativeResponse {
+  return {
+    status: payload.status,
+    headers: { ...payload.headers },
+    body: payload.body,
+    cookies: { ...payload.cookies },
+    url: payload.url,
+  };
+}
+
+export class Response {
+  readonly status: number;
+  readonly statusText: string;
+  readonly ok: boolean;
+  readonly headers: Headers;
+  readonly url: string;
+  readonly redirected: boolean;
+  readonly type: ResponseType = "basic";
+  readonly cookies: Record<string, string>;
+  readonly body: string;
+  bodyUsed = false;
+
+  private readonly payload: NativeResponse;
+  private readonly requestUrl: string;
+
+  constructor(payload: NativeResponse, requestUrl: string) {
+    this.payload = cloneNativeResponse(payload);
+    this.requestUrl = requestUrl;
+    this.status = payload.status;
+    this.statusText = STATUS_CODES[payload.status] ?? "";
+    this.ok = this.status >= 200 && this.status < 300;
+    this.headers = new Headers(payload.headers);
+    this.url = payload.url;
+    this.redirected = this.url !== requestUrl;
+    this.cookies = { ...payload.cookies };
+    this.body = payload.body;
+  }
+
+  async json<T = unknown>(): Promise<T> {
+    const text = await this.text();
+    return JSON.parse(text) as T;
+  }
+
+  async text(): Promise<string> {
+    this.assertBodyAvailable();
+    this.bodyUsed = true;
+    return this.body;
+  }
+
+  clone(): Response {
+    if (this.bodyUsed) {
+      throw new TypeError("Cannot clone a Response whose body is already used");
+    }
+
+    return new Response(cloneNativeResponse(this.payload), this.requestUrl);
+  }
+
+  private assertBodyAvailable(): void {
+    if (this.bodyUsed) {
+      throw new TypeError("Response body is already used");
+    }
+  }
+}
+
+interface AbortHandler {
+  promise: Promise<never>;
+  cleanup: () => void;
+}
+
+function createAbortError(reason?: unknown): Error {
+  const fallbackMessage = typeof reason === "string" ? reason : "The operation was aborted";
+
+  if (typeof DOMException !== "undefined" && reason instanceof DOMException) {
+    return reason.name === "AbortError" ? reason : new DOMException(reason.message || fallbackMessage, "AbortError");
+  }
+
+  if (reason instanceof Error) {
+    reason.name = "AbortError";
+    return reason;
+  }
+
+  if (typeof DOMException !== "undefined") {
+    return new DOMException(fallbackMessage, "AbortError");
+  }
+
+  const error = new Error(fallbackMessage);
+  error.name = "AbortError";
+  return error;
+}
+
+function isAbortError(error: unknown): error is Error {
+  return Boolean(error) && typeof (error as Error).name === "string" && (error as Error).name === "AbortError";
+}
+
+function setupAbort(signal?: AbortSignal | null): AbortHandler | null {
+  if (!signal) {
+    return null;
+  }
+
+  if (signal.aborted) {
+    throw createAbortError(signal.reason);
+  }
+
+  let onAbort: (() => void) | undefined;
+
+  const promise = new Promise<never>((_, reject) => {
+    onAbort = () => {
+      reject(createAbortError(signal.reason));
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+
+  const cleanup = () => {
+    if (onAbort) {
+      signal.removeEventListener("abort", onAbort);
+      onAbort = undefined;
+    }
+  };
+
+  return { promise, cleanup };
+}
+
+function normalizeUrlInput(input: string | URL): string {
+  const value = typeof input === "string" ? input : input.toString();
+
+  if (!value) {
+    throw new RequestError("URL is required");
+  }
+
+  try {
+    return new URL(value).toString();
+  } catch {
+    throw new RequestError(`Invalid URL: ${value}`);
+  }
+}
+
+function validateRedirectMode(mode?: WreqRequestInit["redirect"]): void {
+  if (!mode || mode === "follow") {
+    return;
+  }
+
+  throw new RequestError(`Redirect mode '${mode}' is not supported`);
+}
+
+function serializeBody(body?: BodyInit | null): string | undefined {
+  if (body === null || body === undefined) {
+    return undefined;
+  }
+
+  if (typeof body === "string") {
+    return body;
+  }
+
+  if (Buffer.isBuffer(body)) {
+    return body.toString();
+  }
+
+  if (body instanceof URLSearchParams) {
+    return body.toString();
+  }
+
+  if (body instanceof ArrayBuffer) {
+    return Buffer.from(body).toString();
+  }
+
+  if (ArrayBuffer.isView(body)) {
+    return Buffer.from(body.buffer, body.byteOffset, body.byteLength).toString();
+  }
+
+  throw new TypeError("Unsupported body type; expected string, Buffer, ArrayBuffer, or URLSearchParams");
+}
+
+const SUPPORTED_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"] as const;
+type SupportedMethod = (typeof SUPPORTED_METHODS)[number];
+
+function ensureMethod(method?: string): string {
+  const normalized = method?.trim().toUpperCase();
+  return normalized && normalized.length > 0 ? normalized : "GET";
+}
+
+function assertSupportedMethod(method: string): asserts method is SupportedMethod {
+  if (!SUPPORTED_METHODS.includes(method as SupportedMethod)) {
+    throw new RequestError(`Unsupported HTTP method: ${method}`);
+  }
+}
+
+function ensureBodyAllowed(method: string, body?: string): void {
+  if (!body) {
+    return;
+  }
+
+  if (method === "GET" || method === "HEAD") {
+    throw new RequestError(`Request with ${method} method cannot have a body`);
+  }
+}
+
+function validateBrowserProfile(browser?: BrowserProfile): void {
+  if (!browser) {
+    return;
+  }
+
+  const profiles = getProfiles();
+
+  if (!profiles.includes(browser)) {
+    throw new RequestError(`Invalid browser profile: ${browser}. Available profiles: ${profiles.join(", ")}`);
+  }
+}
+
+async function dispatchRequest(
+  options: RequestOptions,
+  requestUrl: string,
+  signal?: AbortSignal | null,
+): Promise<Response> {
+  const abortHandler = setupAbort(signal);
+  const nativePromise = nativeBinding.request(options);
+  const pending = abortHandler ? Promise.race([nativePromise, abortHandler.promise]) : nativePromise;
+
+  let payload: NativeResponse;
+
+  try {
+    payload = (await pending) as NativeResponse;
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+
+    if (error instanceof RequestError) {
+      throw error;
+    }
+
+    throw new RequestError(String(error));
+  } finally {
+    abortHandler?.cleanup();
+  }
+
+  return new Response(payload, requestUrl);
+}
+
 /**
- * Make an HTTP request with browser impersonation
+ * Fetch-compatible entry point that adds browser impersonation controls.
  *
- * @param options - Request options
- * @returns Promise that resolves to the response
- *
- * @example
- * ```typescript
- * import { request } from 'wreq-js';
- *
- * const response = await request({
- *   url: 'https://example.com/api',
- *   browser: 'chrome_137',
- *   headers: {
- *     'Custom-Header': 'value'
- *   }
- * });
- *
- * console.log(response.status); // 200
- * console.log(response.body);   // Response body
- * ```
+ * @param input - Request URL (string or URL instance)
+ * @param init - Fetch-compatible init options
+ */
+export async function fetch(input: string | URL, init?: WreqRequestInit): Promise<Response> {
+  const url = normalizeUrlInput(input);
+  const config = init ?? {};
+
+  validateRedirectMode(config.redirect);
+  validateBrowserProfile(config.browser);
+
+  const headers = new Headers(config.headers);
+  const method = ensureMethod(config.method);
+  assertSupportedMethod(method);
+  const body = serializeBody(config.body ?? null);
+
+  ensureBodyAllowed(method, body);
+
+  const headerRecord = headers.toObject();
+  const hasHeaders = Object.keys(headerRecord).length > 0;
+
+  const requestOptions: RequestOptions = {
+    url,
+    method,
+    ...(config.browser && { browser: config.browser }),
+    ...(hasHeaders && { headers: headerRecord }),
+    ...(body !== undefined && { body }),
+    ...(config.proxy !== undefined && { proxy: config.proxy }),
+    ...(config.timeout !== undefined && { timeout: config.timeout }),
+  };
+
+  return dispatchRequest(requestOptions, url, config.signal ?? null);
+}
+
+/**
+ * @deprecated Use {@link fetch} instead.
  */
 export async function request(options: RequestOptions): Promise<Response> {
   if (!options.url) {
     throw new RequestError("URL is required");
   }
 
-  if (options.browser) {
-    const profiles = getProfiles();
+  const { url, ...rest } = options;
+  const init: WreqRequestInit = {};
 
-    if (!profiles.includes(options.browser)) {
-      throw new RequestError(`Invalid browser profile: ${options.browser}. Available profiles: ${profiles.join(", ")}`);
-    }
+  if (rest.method !== undefined) {
+    init.method = rest.method;
   }
 
-  try {
-    return await nativeBinding.request(options);
-  } catch (error) {
-    throw new RequestError(String(error));
+  if (rest.headers !== undefined) {
+    init.headers = rest.headers;
   }
+
+  if (rest.body !== undefined) {
+    init.body = rest.body;
+  }
+
+  if (rest.browser !== undefined) {
+    init.browser = rest.browser;
+  }
+
+  if (rest.proxy !== undefined) {
+    init.proxy = rest.proxy;
+  }
+
+  if (rest.timeout !== undefined) {
+    init.timeout = rest.timeout;
+  }
+
+  return fetch(url, init);
 }
 
 /**
@@ -142,48 +591,27 @@ export function getProfiles(): BrowserProfile[] {
 }
 
 /**
- * Convenience function for GET requests
- *
- * @param url - URL to request
- * @param options - Additional request options
- * @returns Promise that resolves to the response
- *
- * @example
- * ```typescript
- * import { get } from 'wreq-js';
- *
- * const response = await get('https://example.com/api');
- * ```
+ * Convenience helper for GET requests using {@link fetch}.
  */
-export async function get(url: string, options?: Omit<RequestOptions, "url" | "method">): Promise<Response> {
-  return request({ ...options, url, method: "GET" });
+export async function get(url: string, init?: Omit<WreqRequestInit, "method">): Promise<Response> {
+  return fetch(url, { ...(init ?? {}), method: "GET" });
 }
 
 /**
- * Convenience function for POST requests
- *
- * @param url - URL to request
- * @param body - Request body
- * @param options - Additional request options
- * @returns Promise that resolves to the response
- *
- * @example
- * ```typescript
- * import { post } from 'wreq-js';
- *
- * const response = await post(
- *   'https://example.com/api',
- *   JSON.stringify({ foo: 'bar' }),
- *   { headers: { 'Content-Type': 'application/json' } }
- * );
- * ```
+ * Convenience helper for POST requests using {@link fetch}.
  */
 export async function post(
   url: string,
-  body?: string,
-  options?: Omit<RequestOptions, "url" | "method" | "body">,
+  body?: BodyInit | null,
+  init?: Omit<WreqRequestInit, "method" | "body">,
 ): Promise<Response> {
-  return request({ ...options, url, method: "POST", ...(body !== undefined && { body }) });
+  const config: WreqRequestInit = {
+    ...(init ?? {}),
+    method: "POST",
+    ...(body !== undefined ? { body } : {}),
+  };
+
+  return fetch(url, config);
 }
 
 /**
@@ -195,7 +623,7 @@ export async function post(
  *
  * const ws = await websocket({
  *   url: 'wss://echo.websocket.org',
- *   browser: 'chrome_137',
+ *   browser: 'chrome_142',
  *   onMessage: (data) => {
  *     console.log('Received:', data);
  *   },
@@ -291,7 +719,7 @@ export async function websocket(options: WebSocketOptions): Promise<WebSocket> {
   try {
     const connection = await nativeBinding.websocketConnect({
       url: options.url,
-      browser: options.browser || "chrome_137",
+      browser: options.browser || DEFAULT_BROWSER,
       headers: options.headers || {},
       ...(options.proxy !== undefined && { proxy: options.proxy }),
       onMessage: options.onMessage,
@@ -306,20 +734,25 @@ export async function websocket(options: WebSocketOptions): Promise<WebSocket> {
 }
 
 export type {
+  BodyInit,
   BrowserProfile,
+  HeadersInit,
   HttpMethod,
+  RequestInit,
   RequestOptions,
-  Response,
   WebSocketOptions,
 } from "./types";
 
-export type { RequestError };
+export { RequestError };
 
 export default {
+  fetch,
   request,
   get,
   post,
   getProfiles,
   websocket,
   WebSocket,
+  Headers,
+  Response,
 };
