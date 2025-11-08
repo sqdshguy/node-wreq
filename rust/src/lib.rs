@@ -21,9 +21,9 @@ const WS_EVENT_BUFFER: usize = 64;
 // Parse browser string to Emulation enum using serde
 fn parse_emulation(browser: &str) -> Emulation {
     // Use serde to deserialize the string into the enum
-    // If deserialization fails, default to Chrome137
+    // If deserialization fails, default to Chrome142
     serde_json::from_value(serde_json::Value::String(browser.to_string()))
-        .unwrap_or(Emulation::Chrome137)
+        .unwrap_or(Emulation::Chrome142)
 }
 
 // Convert JS object to RequestOptions

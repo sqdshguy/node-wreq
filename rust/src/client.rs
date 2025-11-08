@@ -1,15 +1,14 @@
 use anyhow::{Context, Result};
-use dashmap::DashMap;
+use moka::sync::Cache;
 use once_cell::sync::Lazy;
 use serde_json::Value;
-use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use wreq::{Client as HttpClient, Proxy};
 use wreq_util::Emulation;
 
-const CLIENT_CACHE_LIMIT: usize = 1024;
 const TIMEOUT_BUCKET_MS: u64 = 5_000;
 
 pub static HTTP_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
@@ -19,56 +18,17 @@ pub static HTTP_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .expect("Failed to create shared HTTP runtime")
 });
 
-static CLIENT_CACHE: Lazy<ClientCache> = Lazy::new(ClientCache::new);
-
-struct ClientCache {
-    clients: DashMap<ClientKey, Arc<HttpClient>>,
-    order: StdMutex<VecDeque<ClientKey>>,
-}
+static CLIENT_CACHE: Lazy<Cache<ClientKey, Arc<HttpClient>>> = Lazy::new(|| {
+    Cache::builder()
+        .time_to_idle(Duration::from_secs(300)) // 5 minute idle timeout
+        .build()
+});
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ClientKey {
     emulation: String,
     proxy: Option<String>,
     timeout_bucket: u64,
-}
-
-impl ClientCache {
-    fn new() -> Self {
-        Self {
-            clients: DashMap::new(),
-            order: StdMutex::new(VecDeque::new()),
-        }
-    }
-
-    fn get_or_try_insert<F>(&self, key: ClientKey, builder: F) -> Result<Arc<HttpClient>>
-    where
-        F: FnOnce() -> Result<HttpClient>,
-    {
-        if let Some(entry) = self.clients.get(&key) {
-            let client = entry.clone();
-            drop(entry);
-            self.bump_key(&key);
-            return Ok(client);
-        }
-
-        let client = Arc::new(builder()?);
-        self.clients.insert(key.clone(), client.clone());
-        self.bump_key(&key);
-        Ok(client)
-    }
-
-    fn bump_key(&self, key: &ClientKey) {
-        let mut order = self.order.lock().unwrap();
-        order.retain(|existing| existing != key);
-        order.push_back(key.clone());
-
-        while order.len() > CLIENT_CACHE_LIMIT {
-            if let Some(oldest) = order.pop_front() {
-                self.clients.remove(&oldest);
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -188,7 +148,9 @@ fn get_or_build_client(options: &RequestOptions) -> Result<Arc<HttpClient>> {
         timeout_bucket: bucket_timeout(options.timeout),
     };
 
-    CLIENT_CACHE.get_or_try_insert(key, || build_client(options))
+    CLIENT_CACHE
+        .try_get_with(key, || build_client(options).map(Arc::new))
+        .map_err(|e| anyhow::anyhow!("Failed to get or build client: {}", e))
 }
 
 fn build_client(options: &RequestOptions) -> Result<HttpClient> {
