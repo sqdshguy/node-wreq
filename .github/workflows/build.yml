@@ -102,6 +102,3 @@ jobs:
 
       - name: Publish to npm with trusted publishing
         run: npm publish --provenance --access public
-        env:
-          # TODO: Remove this after initial publish and trusted publisher is configured on npmjs.com
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
