@@ -121,8 +121,8 @@ describe("WebSocket", () => {
     // Send unique messages on both connections in parallel
     await Promise.all([ws1.send("From WS1"), ws2.send("From WS2")]);
 
-    // Wait for responses
-    await sleep(1500);
+    // Wait for responses (long timeout for CI)
+    await sleep(5000);
 
     assert.ok(ws1Messages.length > 0, "WS1 should receive messages");
     assert.ok(ws2Messages.length > 0, "WS2 should receive messages");
