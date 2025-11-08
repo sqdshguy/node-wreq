@@ -35,12 +35,12 @@ fn js_object_to_request_options(
     let url: Handle<JsString> = obj.get(cx, "url")?;
     let url = url.value(cx);
 
-    // Get browser (optional, defaults to chrome_137)
+    // Get browser (optional, defaults to chrome_142)
     let browser_str = obj
         .get_opt(cx, "browser")?
         .and_then(|v: Handle<JsValue>| v.downcast::<JsString, _>(cx).ok())
         .map(|v| v.value(cx))
-        .unwrap_or_else(|| "chrome_137".to_string());
+        .unwrap_or_else(|| "chrome_142".to_string());
 
     let emulation = parse_emulation(&browser_str);
 
@@ -185,12 +185,12 @@ fn websocket_connect(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let url: Handle<JsString> = options_obj.get(&mut cx, "url")?;
     let url = url.value(&mut cx);
 
-    // Get browser (optional, defaults to chrome_137)
+    // Get browser (optional, defaults to chrome_142)
     let browser_str = options_obj
         .get_opt(&mut cx, "browser")?
         .and_then(|v: Handle<JsValue>| v.downcast::<JsString, _>(&mut cx).ok())
         .map(|v| v.value(&mut cx))
-        .unwrap_or_else(|| "chrome_137".to_string());
+        .unwrap_or_else(|| "chrome_142".to_string());
 
     let emulation = parse_emulation(&browser_str);
 

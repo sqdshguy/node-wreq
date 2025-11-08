@@ -214,6 +214,6 @@ fn bucket_timeout(timeout: u64) -> u64 {
 fn emulation_label(emulation: &Emulation) -> String {
     match serde_json::to_value(emulation) {
         Ok(Value::String(label)) => label,
-        _ => "chrome_137".to_string(),
+        _ => "chrome_142".to_string(),
     }
 }
