@@ -1,6 +1,6 @@
 [package]
 name = "wreq-js"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2024"
 license = "MIT"
 authors = ["will-work-for-meal", "Oleksandr Herasymov"]
