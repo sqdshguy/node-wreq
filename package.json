@@ -1,7 +1,7 @@
 {
   "name": "wreq-js",
   "version": "1.0.0",
-  "description": "Browser fingerprint bypass library using Rust for TLS/HTTP2 impersonation",
+  "description": "High-performance HTTP client for Node.JS with real-browser TLS and HTTP/2 fingerprints, powered by Rust",
   "main": "dist/wreq-js.js",
   "types": "dist/wreq-js.d.ts",
   "exports": {
