@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use futures_util::{SinkExt, StreamExt};
+use indexmap::IndexMap;
 use neon::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -27,7 +28,7 @@ pub static WS_RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
 pub struct WebSocketOptions {
     pub url: String,
     pub emulation: Emulation,
-    pub headers: HashMap<String, String>,
+    pub headers: IndexMap<String, String>,
     pub proxy: Option<String>,
 }
 
@@ -123,7 +124,7 @@ pub async fn connect_websocket(
     let mut request = client.websocket(&options.url);
 
     // Apply custom headers
-    for (key, value) in &options.headers {
+    for (key, value) in options.headers.iter() {
         request = request.header(key, value);
     }
 
