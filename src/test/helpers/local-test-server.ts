@@ -98,7 +98,10 @@ export async function startLocalTestServer(): Promise<LocalTestServer> {
     }
 
     if (path === "/headers") {
-      return json(res, { headers: canonicalizeHeaders(req) });
+      return json(res, {
+        headers: canonicalizeHeaders(req),
+        rawHeaders: req.rawHeaders,
+      });
     }
 
     if (path === "/cookies") {
