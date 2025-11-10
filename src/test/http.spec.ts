@@ -84,7 +84,7 @@ describe("HTTP", () => {
     const response = await wreqFetch(httpUrl("/headers"), {
       browser: "chrome_142",
       headers: {
-        "Accept": customAccept,
+        Accept: customAccept,
       },
       disableDefaultHeaders: true,
       timeout: 10000,
@@ -108,7 +108,7 @@ describe("HTTP", () => {
     const response = await wreqFetch(httpUrl("/headers"), {
       browser: "chrome_142",
       headers: {
-        "Accept": customAccept,
+        Accept: customAccept,
       },
       timeout: 10000,
     });
@@ -119,10 +119,7 @@ describe("HTTP", () => {
     const accept = body.headers.Accept;
 
     assert.ok(accept, "Should have Accept header");
-    assert.ok(
-      accept.includes(customAccept),
-      "Should include custom Accept header",
-    );
+    assert.ok(accept.includes(customAccept), "Should include custom Accept header");
 
     console.log("Accept with emulation (may be overwritten):", accept);
   });
