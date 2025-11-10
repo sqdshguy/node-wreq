@@ -149,6 +149,14 @@ export interface RequestInit {
    * Identifier of an existing session created elsewhere (e.g., via {@link createSession}).
    */
   sessionId?: string;
+
+  /**
+   * Disable default headers from browser emulation. When enabled, only explicitly
+   * provided headers will be sent with the request, preventing emulation headers
+   * from being automatically added or appended.
+   * @default false
+   */
+  disableDefaultHeaders?: boolean;
 }
 
 /**
@@ -256,6 +264,14 @@ export interface RequestOptions {
    * @internal
    */
   ephemeral?: boolean;
+
+  /**
+   * Disable default headers from browser emulation. When enabled, only explicitly
+   * provided headers will be sent with the request, preventing emulation headers
+   * from being automatically added or appended.
+   * @default false
+   */
+  disableDefaultHeaders?: boolean;
 }
 
 /**
