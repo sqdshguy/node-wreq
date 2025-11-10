@@ -232,7 +232,7 @@ export interface RequestOptions {
    * Additional headers to send with the request.
    * Browser-specific headers will be automatically added based on the selected browser profile.
    */
-  headers?: Record<string, string>;
+  headers?: Record<string, string> | HeaderTuple[];
 
   /**
    * Request body data (for POST, PUT, PATCH requests).
@@ -349,7 +349,7 @@ export interface WebSocketOptions {
    * Additional headers to send with the WebSocket upgrade request.
    * Common headers include Authorization, Origin, or custom application headers.
    */
-  headers?: Record<string, string>;
+  headers?: Record<string, string> | HeaderTuple[];
 
   /**
    * Proxy URL to route the connection through (e.g., 'http://proxy.example.com:8080').
