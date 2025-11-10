@@ -6,6 +6,10 @@ import { createSession, getProfiles, Headers, RequestError, withSession, fetch a
 const HTTP_TEST_BASE_URL = process.env.HTTP_TEST_BASE_URL ?? "https://httpbingo.org";
 const httpUrl = (path: string) => new URL(path, HTTP_TEST_BASE_URL).toString();
 
+function headerIndex(rawHeaders: string[], name: string) {
+  return rawHeaders.findIndex((value, index) => index % 2 === 0 && value.toLowerCase() === name.toLowerCase());
+}
+
 describe("HTTP", () => {
   before(() => {
     console.log("🔌 HTTP Test Suite\n");
@@ -122,6 +126,64 @@ describe("HTTP", () => {
     assert.ok(accept.includes(customAccept), "Should include custom Accept header");
 
     console.log("Accept with emulation (may be overwritten):", accept);
+  });
+
+  test("should keep custom header order intact", async () => {
+    const orderedHeaders = new Headers();
+    orderedHeaders.append("X-First", "one");
+    orderedHeaders.append("X-Second", "two");
+    orderedHeaders.append("X-Third", "three");
+
+    const response = await wreqFetch(httpUrl("/headers"), {
+      browser: "chrome_142",
+      headers: orderedHeaders,
+      disableDefaultHeaders: true,
+      timeout: 10000,
+    });
+
+    assert.strictEqual(response.status, 200, "Should return status 200");
+    const body = await response.json<{ rawHeaders: string[] }>();
+    assert.ok(body.rawHeaders, "Should include rawHeaders in the response");
+
+    const headerIndex = (name: string) =>
+      body.rawHeaders.findIndex((value, index) => index % 2 === 0 && value.toLowerCase() === name.toLowerCase());
+
+    const firstIndex = headerIndex("X-First");
+    const secondIndex = headerIndex("X-Second");
+    const thirdIndex = headerIndex("X-Third");
+
+    assert.ok(firstIndex !== -1, "X-First header should be present");
+    assert.ok(secondIndex !== -1, "X-Second header should be present");
+    assert.ok(thirdIndex !== -1, "X-Third header should be present");
+    assert.ok(firstIndex < secondIndex, "X-First should appear before X-Second");
+    assert.ok(secondIndex < thirdIndex, "X-Second should appear before X-Third");
+  });
+
+  test("should keep object header order intact", async () => {
+    const response = await wreqFetch(httpUrl("/headers"), {
+      browser: "chrome_142",
+      headers: {
+        "X-Start": "alpha",
+        "X-Middle": "beta",
+        "X-End": "gamma",
+      },
+      disableDefaultHeaders: true,
+      timeout: 10000,
+    });
+
+    assert.strictEqual(response.status, 200, "Should return status 200");
+    const body = await response.json<{ rawHeaders: string[] }>();
+    assert.ok(body.rawHeaders, "Should include rawHeaders in the response");
+
+    const startIndex = headerIndex(body.rawHeaders, "X-Start");
+    const middleIndex = headerIndex(body.rawHeaders, "X-Middle");
+    const endIndex = headerIndex(body.rawHeaders, "X-End");
+
+    assert.ok(startIndex !== -1, "X-Start header should be present");
+    assert.ok(middleIndex !== -1, "X-Middle header should be present");
+    assert.ok(endIndex !== -1, "X-End header should be present");
+    assert.ok(startIndex < middleIndex, "X-Start should precede X-Middle");
+    assert.ok(middleIndex < endIndex, "X-Middle should precede X-End");
   });
 
   test("should provide functional clone and text helpers", async () => {
