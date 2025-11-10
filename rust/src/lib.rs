@@ -104,6 +104,12 @@ fn js_object_to_request_options(
         .map(|v| v.value(cx))
         .unwrap_or(false);
 
+    let disable_default_headers = obj
+        .get_opt(cx, "disableDefaultHeaders")?
+        .and_then(|v: Handle<JsValue>| v.downcast::<JsBoolean, _>(cx).ok())
+        .map(|v| v.value(cx))
+        .unwrap_or(false);
+
     Ok(RequestOptions {
         url,
         emulation,
@@ -114,6 +120,7 @@ fn js_object_to_request_options(
         timeout,
         session_id,
         ephemeral,
+        disable_default_headers,
     })
 }
 
